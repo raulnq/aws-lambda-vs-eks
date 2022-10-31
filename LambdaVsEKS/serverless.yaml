@@ -1,0 +1,64 @@
+service: app
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: dotnet6
+  tracing:
+    lambda: true
+    apiGateway: true
+  environment:
+    QUEUEURL: { Ref: postQueue }
+  iam:
+    role:
+      statements: 
+        - Effect: Allow
+          Action:
+            - dynamodb:*
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - sqs:*
+          Resource: '*'
+package:
+  individually: true
+
+functions:
+  post-minimal:
+    timeout: 30
+    handler: MinimalAPI
+    package:
+      artifact: MinimalAPI/bin/Release/net6.0/MinimalAPI.zip
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+  post-lambda:
+    timeout: 30
+    handler: Lambda::Lambda.Function::FunctionHandler
+    package:
+      artifact: Lambda/bin/Release/net6.0/Lambda.zip
+    events:
+      - http:
+          path: /lambda
+          method: post
+
+resources:
+  Resources:
+    postTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: PostsTable
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    postQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        QueueName: PostsQueue
